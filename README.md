@@ -53,3 +53,8 @@ npm test
 ## License
 
 MIT
+
+## Changelog
+
+- **0.1.1** — bump for CI publish validation; zero-config default provider (antigravity_cli).
+- **0.1.0** — initial release: dual providers, 4 multimodal tools.

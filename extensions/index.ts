@@ -37,7 +37,7 @@ function loadConfig(): AppConfig {
 }
 
 const config: AppConfig = loadConfig();
-const PROVIDER = config.provider ?? "gemini_api";
+const PROVIDER = config.provider ?? "antigravity_cli"; // zero-config: local agy, no key
 const API_KEY = config.apiKey ?? "";
 const OUTPUT_DIR = config.outputDir ?? join(tmpdir(), "pi-gemini-multimodal");
 const SKIP_PERMISSIONS = config.skipPermissions !== false;
@@ -152,7 +152,7 @@ function runAgy(prompt: string, signal?: AbortSignal): Promise<string> {
     const done = (fn: () => void) => { clearTimeout(timer); fn(); };
     child.stdout?.on("data", (d) => (out += String(d)));
     child.stderr?.on("data", (d) => (err += String(d)));
-    child.on("error", (e) => done(() => reject(new Error(`agy not available on PATH: ${e.message}`))));
+    child.on("error", () => done(() => reject(new Error("agy not found on PATH. Install: curl -fsSL https://antigravity.google/cli/install.sh | bash, then run `agy` once and sign in. Or set provider: gemini_api + apiKey (aistudio.google.com)."))));
     child.on("close", (code) => done(() => {
       const text = out.trim();
       if (!text) reject(new Error(err.trim() || `agy exited with code ${code}`));
@@ -185,7 +185,7 @@ async function agyGenerateImage(prompt: string): Promise<string> {
 
 function dispatch(action: string, arg: { source?: string; question?: string; prompt?: string }, signal?: AbortSignal): Promise<string> {
   if (PROVIDER === "gemini_api") {
-    if (!API_KEY) throw new Error("apiKey is required when provider is gemini_api (get one at aistudio.google.com)");
+    if (!API_KEY) throw new Error("provider gemini_api needs apiKey - get one at aistudio.google.com, or switch to antigravity_cli (local agy, no key).");
     switch (action) {
       case "understand": return geminiUnderstand(arg.source!, arg.question ?? "", signal);
       case "transcribe": return geminiTranscribe(arg.source!, signal);

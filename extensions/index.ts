@@ -11,7 +11,7 @@
 //
 // Tools: media_understand / media_transcribe / image_generate / read_document
 
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { detectSupportedImageMimeTypeFromFile, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
@@ -59,6 +59,16 @@ export function guessMime(pathOrUrl: string): string {
   return MIME_BY_EXT[extname(clean).slice(1).toLowerCase()] ?? "application/octet-stream";
 }
 
+// Sniff local files by content instead of trusting the extension; the helper only
+// resolves image types, so everything else (video/audio/pdf/URLs) keeps the ext map.
+export async function detectMime(source: string): Promise<string> {
+  if (!/^https?:\/\//i.test(source)) {
+    const detected = await detectSupportedImageMimeTypeFromFile(source).catch(() => null);
+    if (detected) return detected;
+  }
+  return guessMime(source);
+}
+
 async function loadBytes(source: string, signal?: AbortSignal): Promise<Uint8Array> {
   if (/^https?:\/\//i.test(source)) {
     const res = await fetch(source, { signal });
@@ -92,7 +102,7 @@ function geminiUnderstand(source: string, question: string, signal?: AbortSignal
   return loadBytes(source, signal).then(async (bytes) => {
     const { text } = await geminiCall(
       [
-        { inlineData: { mimeType: guessMime(source), data: Buffer.from(bytes).toString("base64") } },
+        { inlineData: { mimeType: await detectMime(source), data: Buffer.from(bytes).toString("base64") } },
         { text: question || "Describe this media in detail." },
       ],
       DEFAULT_MODEL,
@@ -106,7 +116,7 @@ function geminiTranscribe(source: string, signal?: AbortSignal): Promise<string>
   return loadBytes(source, signal).then(async (bytes) => {
     const { text } = await geminiCall(
       [
-        { inlineData: { mimeType: guessMime(source), data: Buffer.from(bytes).toString("base64") } },
+        { inlineData: { mimeType: await detectMime(source), data: Buffer.from(bytes).toString("base64") } },
         { text: "Transcribe this audio/video to text verbatim, with timestamps where useful." },
       ],
       DEFAULT_MODEL,
@@ -120,7 +130,7 @@ function geminiReadDocument(path: string, question: string, signal?: AbortSignal
   return loadBytes(path, signal).then(async (bytes) => {
     const { text } = await geminiCall(
       [
-        { inlineData: { mimeType: guessMime(path), data: Buffer.from(bytes).toString("base64") } },
+        { inlineData: { mimeType: await detectMime(path), data: Buffer.from(bytes).toString("base64") } },
         { text: question || "Summarize this document: main points and anything actionable." },
       ],
       DEFAULT_MODEL,
